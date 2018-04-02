@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+
+LABEL2RESTIC=$(which label2restic)
+if [[ ! -x $LABEL2RESTIC ]]; then
+  echo "Label2Restic binary not found"
+  exit 1
+fi
+
+$LABEL2RESTIC

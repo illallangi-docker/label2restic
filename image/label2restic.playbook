@@ -1,0 +1,50 @@
+---
+- hosts: all
+  tasks:
+    - rpm_key:
+        key:   "{{ item }}"
+        state: "present"
+      with_items:
+      - "https://download.docker.com/linux/centos/gpg"
+    - yum_repository:
+        file:        "docker-ce"
+        name:        "docker-ce-stable"
+        description: "Docker CE Stable - $basearch"
+        baseurl:     "https://download.docker.com/linux/centos/7/$basearch/stable"
+        enabled:     "yes"
+        gpgcheck:    "yes"
+        gpgkey:      "https://download.docker.com/linux/centos/gpg"
+    - yum:
+        pkg: "{{ item }}"
+        state: present
+      with_items:
+        - "which"
+        - "docker-ce"
+        - "bzip2"
+        - "unzip"
+        - "jq"
+    - get_url:
+        url:        "https://github.com/restic/restic/releases/download/v0.8.3/restic_0.8.3_linux_amd64.bz2"
+        dest:       "/usr/local/src/restic_0.8.3_linux_amd64.bz2"
+        checksum:   "sha256:1e9aca80c4f4e263c72a83d4333a9dac0e24b24e1fe11a8dc1d9b38d77883705"
+    - file:
+        path:  "/usr/lib/restic_0.8.3_linux_amd64"
+        state: "directory"
+    - shell: "bzcat /usr/local/src/restic_0.8.3_linux_amd64.bz2 > /usr/lib/restic_0.8.3_linux_amd64/restic"
+      args:
+        creates: "/usr/lib/restic_0.8.3_linux_amd64/restic"
+    - file:
+        path:  "/usr/lib/restic_0.8.3_linux_amd64/restic"
+        state: "file"
+        mode:  "0700"
+    - file:
+         path:  "/usr/local/bin/restic"
+         src:   "/usr/lib/restic_0.8.3_linux_amd64/restic"
+         state: "link"
+    - template:
+        src:  "{{ item }}.j2"
+        dest: "/usr/local/bin/{{ item }}"
+        mode: 0755
+      with_items:
+        - "label2restic"
+        - "ansible-entrypoint.sh"

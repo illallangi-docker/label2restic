@@ -1,0 +1,22 @@
+---
+- hosts: all
+  tasks:
+    - name: "Check all required variables are defined"
+      fail:
+        msg: "{{ item }} is not defined. Typically you should run with: '-e {{ item }}=value'"
+      when:
+        - ansible_env[item] is not defined
+      with_items:
+        - "LABEL2RESTIC_TIMEZONE"
+        - "RESTIC_REPOSITORY"
+        - "RESTIC_PASSWORD"
+    - name: "Set timezone to {{ ansible_env.LABEL2RESTIC_TIMEZONE }}"
+      file:
+        state: "link"
+        dest:  "/etc/localtime"
+        src:   "/usr/share/zoneinfo/{{ ansible_env.LABEL2RESTIC_TIMEZONE }}"
+        force: "yes"
+    - template:
+        src:  "label2restic-entrypoint.sh.j2"
+        dest: "/usr/local/bin/label2restic-entrypoint.sh"
+        mode: 0755

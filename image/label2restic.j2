@@ -1,0 +1,65 @@
+#! /bin/bash
+
+LABEL2RESTIC=$0
+if [[ ! -x $LABEL2RESTIC ]]; then
+  echo "Label2Restic binary not found"
+  exit 1
+fi
+
+DOCKER=$(which docker)
+if [[ ! -x $DOCKER ]]; then
+  echo "Docker binary not found"
+  exit 1
+fi
+
+RESTIC=$(which restic)
+if [[ ! -x $RESTIC ]]; then
+  echo "Restic binary not found"
+  exit 1
+fi
+
+JQ=$(which jq)
+if [[ ! -x $JQ ]]; then
+  echo "JQ binary not found"
+  exit 1
+fi
+
+if [ "$#" -lt 2 ]; then
+  $DOCKER ps -q | xargs -L 1 $LABEL2RESTIC scan
+  exit 0
+fi
+
+CONTAINER=$2
+DIRECTORY=$3
+
+case $1 in
+  scan)
+    echo Scanning container $CONTAINER
+    $DOCKER inspect $CONTAINER | $JQ -r '.[0]."Config"."Labels" |= with_entries(select(.key|test("^enterprises\\.illallangi\\.restic\\.dir\\..*$"))) | .[0]."Config"."Labels" | map(.) | .[]' | sort | xargs -L 1 $LABEL2RESTIC backup $CONTAINER
+    ;;
+  
+  backup)
+    RESTICHOST=$($DOCKER inspect $2 | $JQ -r '.[0]."Config"."Labels" |= with_entries(select(.key|test("^enterprises\\.illallangi\\.restic\\.hostname$"))) | .[0]."Config"."Labels" | map(.) | .[]' | sort)
+    if [ -z "$RESTICHOST" ]; then    
+      exit 0
+    fi;
+    
+    INSTANCE=$($DOCKER inspect $2 | $JQ -r '.[0]."Config"."Labels" |= with_entries(select(.key|test("^enterprises\\.illallangi\\.instance$"))) | .[0]."Config"."Labels" | map(.) | .[]' | sort)
+    if [ -z "$INSTANCE" ]; then    
+      exit 0
+    fi;
+    
+    SERVICE=$($DOCKER inspect $2 | $JQ -r '.[0]."Config"."Labels" |= with_entries(select(.key|test("^enterprises\\.illallangi\\.service$"))) | .[0]."Config"."Labels" | map(.) | .[]' | sort)
+    if [ -z "$SERVICE" ]; then    
+      exit 0
+    fi;
+    
+    echo Backing up $DIRECTORY from $INSTANCE/$SERVICE to $RESTIC_REPOSITORY
+    $RESTIC backup --hostname $RESTICHOST --tag $INSTANCE/$SERVICE $DIRECTORY
+    ;;
+  
+  *)
+    exit 1
+esac
+
+
